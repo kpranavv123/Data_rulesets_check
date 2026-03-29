@@ -1,0 +1,13 @@
+Name	Site	Description	PartClass	ProductFamily	UnitOfMeasure	TCPL_MRPTYPE	ProcurementType	ABCCode	IBPSTATUS	XPLANTMATSTATUS
+14000000001234	IN01	Finished Goods - Detergent Powder 1KG	FERT	Home Care	KG	PD	E	A	IBP	2
+14000000005678	IN02	Finished Goods - Shampoo 200ML	FERT	Personal Care	EA	ND	I	B	IBP	
+15000000009999	IN03	Trading Goods - Industrial Cleaner	HAWA	Industrial	TO	PD	F	C		2
+14000000002345	IN01		FERT	Home Care	KG	PD	E	A	IBP	2
+	IN02	Finished Goods - Soap Bar 100G	FERT	Personal Care	EA	ND	I	B	IBP	2
+14000000003456		Finished Goods - Floor Cleaner 5L	FERT	Home Care	LTR	XX	E	A	IBP	2
+13000000001111	IN01	Raw Material - Caustic Soda	FERT	Home Care	KG	PD	E	A	IBP	2
+15000000007890	IN04	Trading Goods - Packaging Film	HAWA	Packaging		PD	E		IBP	
+14000000004567	IN02	Finished Goods - Dish Wash Liquid 1L	ZFRT	Home Care	KG	PD	E	B	ACTIVE	5
+16000000001234	IN03	Finished Goods - Fabric Conditioner	HAWA	Home Care	PAL	PD	I	C	IBP	2
+14000000006789	IN01	Finished Goods - Toilet Cleaner 500ML	FERT	Home Care	CV	ND	F	A	IBP	2
+15000000003456	IN03	Trading Goods - Spray Bottle	HAWA	Packaging	EA	ND	I	B		
