@@ -1,22 +1,3 @@
-"""
-Part Table Ruleset Validator
------------------------------
-Input  : .tab file (tab-delimited)
-Output : Excel file with error-highlighted cells and an "Errors" summary column
-
-Rulesets implemented (from Part (FG) sheet):
-  P_RS_1  Name           – Not blank; FERT → 14xxxxxxxxxxxxxx, HAWA → 15xxxxxxxxxxxxxx
-  P_RS_2  Site           – Not blank
-  P_RS_3  Description    – Not blank
-  P_RS_4  PartClass      – Not blank; must be FERT or HAWA
-  P_RS_5  ProductFamily  – Not blank
-  P_RS_6  UnitOfMeasure  – Not blank; must be in {KG, CV, TO, EA, PAL}
-  P_RS_7  TCPL_MRPTYPE   – Not blank; must be ND or PD
-  P_RS_8  ProcurementType– Not blank
-  P_RS_9  ABCCode        – Not blank
-  P_RS_10 IBPSTATUS      – Must be IBP or blank
-  P_RS_11 XPLANTMATSTATUS– Must be 2 or blank
-"""
 
 import pandas as pd
 import openpyxl
@@ -70,9 +51,9 @@ def check_name(row) -> str | None:
     except ValueError:
         return "Name must be numeric"
     if part_class == "FERT" and not (FERT_MIN <= num <= FERT_MAX):
-        return f"Name out of FERT range (14000000000000–14999999999999)"
+        return f"Name out of FERT range (14000000000000-14999999999999)"
     if part_class == "HAWA" and not (HAWA_MIN <= num <= HAWA_MAX):
-        return f"Name out of HAWA range (15000000000000–15999999999999)"
+        return f"Name out of HAWA range (15000000000000-15999999999999)"
     return None
 
 
@@ -169,7 +150,7 @@ def process(tab_path: str, output_path: str):
     # ── Build Excel workbook ─────────────────────────────────────────────────
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Part (FG) – Validated"
+    ws.title = "Part (FG)-Validated"
 
     # ─ Meta info rows ────────────────────────────────────────────────────────
     meta_lines = [
