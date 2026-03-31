@@ -402,52 +402,43 @@ def main(input_path, output_folder="output"):
 
     os.makedirs(output_folder, exist_ok=True)
 
-    xl = pd.ExcelFile(input_path)
-    print(f"\nSheets in '{os.path.basename(input_path)}': {xl.sheet_names}")
+    # Read ONLY the single sheet in Part.xlsx
+    df = pd.read_excel(input_path, dtype=str).fillna("")
+    print(f"\n[Part]  File: '{os.path.basename(input_path)}'")
+    print(f"        Rows: {len(df)} | Columns: {len(df.columns)}")
+    print(f"        Input columns: {list(df.columns)}")
 
-    configs = [
-        ("part", PART_ALIASES, PART_RULE_DEFS, "Part (FG)", "Part_Validated.xlsx", PART_LEGEND),
-        ("site", SITE_ALIASES, SITE_RULE_DEFS, "Site",      "Site_Validated.xlsx", SITE_LEGEND),
-    ]
-    results = []
+    # Build column map for PART
+    col_map = build_col_map(list(df.columns), PART_ALIASES)
+    print(f"        Matched rules: {col_map}")
 
-    for target, aliases, rule_defs, label, out_name, legend in configs:
-        matched_sheet = next(
-     (s for s in xl.sheet_names if target in s.strip().lower()), None
-      )
-        if not matched_sheet:
-            print(f"\n  [{label}]  Sheet '{target}' not found - skipping")
-            continue
+    # Validate
+    error_map, err_summary = validate_dataframe(df, col_map, PART_RULE_DEFS)
 
-        df = pd.read_excel(input_path, sheet_name=matched_sheet, dtype=str).fillna("")
-        print(f"\n  [{label}]  Sheet: '{matched_sheet}'  |  {len(df)} rows  |  {len(df.columns)} columns")
-        print(f"             Input columns : {list(df.columns)}")
+    # Write output
+    out_path = os.path.join(output_folder, "Part_Validated.xlsx")
+    write_validated_excel(
+        df,
+        error_map,
+        err_summary,
+        col_map,
+        PART_RULE_DEFS,
+        out_path,
+        sheet_label="Part (FG)",
+        legend_data=PART_LEGEND
+    )
 
-        col_map = build_col_map(list(df.columns), aliases)
-        print(f"             Matched rules : {col_map}")
+    errored = sum(1 for e in err_summary if e)
 
-        error_map, err_summary = validate_dataframe(df, col_map, rule_defs)
+    print(f"\nValidation completed")
+    print(f"Total rows : {len(df)}")
+    print(f"Errors     : {errored}")
+    print(f"OK rows    : {len(df) - errored}")
+    print(f"Output     : {out_path}")
 
-        out_path = os.path.join(output_folder, out_name)
-        write_validated_excel(df, error_map, err_summary, col_map,
-                              rule_defs, out_path, label, legend)
-
-        errored = sum(1 for e in err_summary if e)
-        results.append((label, len(df), errored, out_path))
-
-        print(f"             Errors: {errored}  |  OK: {len(df)-errored}")
-        for i, s in enumerate(err_summary, 1):
-            print(f"    Row {i:>4}: {'OK' if not s else 'ERROR -> ' + s}")
-
-    print(f"\n{'='*62}")
-    print(f"  DONE  |  Output folder: ./{output_folder}/")
-    print(f"{'='*62}")
-    for label, total, errored, path in results:
-        print(f"  {label:<12} -> {os.path.basename(path):<30}  ({total} rows | {errored} errors)")
-    print(f"{'='*62}\n")
 
 
 if __name__ == "__main__":
-    input_file = r"D:\SEM-8\Data Rules Set Check\Data_rulesets_check\Sample data file - Pranav.xlsx"
+    input_file = r"C:/Users/SW526XH/Downloads/Data Quality Check/Part.xlsx"
     output_folder = "output"
     main(input_file, output_folder)

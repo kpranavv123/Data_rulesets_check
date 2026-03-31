@@ -1,0 +1,90 @@
+HDA(Sample Data ) mapping
+
+1)MATERIAl---Part Name---Part site combination to be present in the Part master,Field should not be blank
+2)SOLDTOPARTY_CUSTOMER----Customer-----Site customer combination to be present in customer master,Field should not be blank
+3)PLANT-----Site---- Site to be present in the Site master,Field should not be blank
+4)INVOICE_DATE-----Date----
+
+
+
+
+Part Table mapping
+
+1)MATERIALNUMBER-----For FERT type: Material should range between 14000000000000 and 14999999999999,For HAWA type: Material should range between 15000000000000 and 15999999999999.
+
+Doubt 2)PLANT----- To validate against consolidated PL list shared by Ajay, Field should not be blank
+
+3)PRODUCTDESCRIPTION-----Field should not be blank
+
+4)PRODUCTTYPE--- Field should be either FERT/HAWA,and should not be blank
+
+5)PRODUCTHIERARCHY---Should not be blank
+
+Doubt 6)BASEUNIT---To validate against Std Alt UOMs list for Part site combination,shuld not be blank---Ignore
+
+7)MRPTYPE--- Field value should be ND/PD and feild should not be empty
+
+8)PROCUREMENTTYPE---Feild should not be empty
+
+9)ABCINDICATOR---Feild should not be empty
+
+10)IBPSTATUS---Field values should be either IBP/Blanks
+
+11)XPLANTMATSTATUS---Field values should be either 2/Blanks
+
+
+Site Table Mapping
+
+Doubt 1)PLANT-To be present in consolidated PL list shared by Ajay,All sites in consolidated PL list shared should have active part site combinations in part master,should not be blank
+
+2)NAME:Should not be blank
+
+3)ADDRESS:Should not be blank
+
+Doubt 4)TCPL_PLANTTYPE:
+
+5)COMPANYCODE:Field should be 1001 / 1006 / 1009,Field should not be blank
+
+
+Customer Table Mapping:
+
+1)CUSTOMER  (alias ID)--Customer in HDA and Independent demand to be present in this Customer master
+
+2)CUSTOMERNAME(alias Name)---Should not be blank
+
+3)SUPPLYINGPLANT---should be present in Site table of PLANT Column and should not be empty
+
+4)CUSTOMERGROUP--Should not be blank
+
+5)CUSTOMERGROUP_NAME--should not be blank
+
+6)SALESORGANIZATION--Should not be blank
+
+7)All the other feilds also same --Should not be blank
+
+
+Historical Demand Actuals Mapping:
+
+1)MATERIAL column should be present in Part Table,so find it in MATERIALNUMBER
+
+2)PLANT column should be preent in Site table,find it in PLANT column of Site table
+
+Doubt-3)Customer column (which column to match in Historical Demand Actuals)
+
+
+4)BILLING_WEEK_START column should be YYYYMMDD format and should not be blank
+
+NOTE:Your sheet size is: 9249355, 8 Max sheet size is: 1048576, 16384
+
+
+
+
+
+
+
+
+
+
+
+
+
