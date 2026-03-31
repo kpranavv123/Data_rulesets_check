@@ -41,7 +41,7 @@ Doubt 1)PLANT-To be present in consolidated PL list shared by Ajay,All sites in 
 
 3)ADDRESS:Should not be blank
 
-Doubt 4)TCPL_PLANTTYPE:
+Doubt 4)TCPL_PLANTTYPE:Should not be blank
 
 5)COMPANYCODE:Field should be 1001 / 1006 / 1009,Field should not be blank
 
