@@ -50,8 +50,8 @@ class CustomerRuleEngine:
 
     # ─ Rule 1: CUSTOMER ─
     # Must NOT be blank AND must exist in:
-    #   • PLANT column of HDA.tab
-    #   • PRODUCTIONPLANT column of IndependentDemand.tab
+    #   • SOLDTOPARTY column of HDA.tab
+    #   • SOLDTOPARTY column of IndependentDemand.tab
     def validate_customer(self, row) -> bool:
         val = row.get("CUSTOMER", None)
         if self._is_blank(val):
@@ -232,21 +232,21 @@ class CustomerTableValidator:
         self.site_plants = set(site_df["PLANT"].dropna().str.strip().tolist())
         print(f"    Site table  – PLANT values loaded        : {len(self.site_plants)}")
 
-        # ── HDA.tab → PLANT column for CUSTOMER rule ──────────────────────
+        # ── HDA.tab → SOLDTOPARTY column for CUSTOMER rule ───────────────
         hda_df = pd.read_csv(self.hda_path, sep="\t", dtype=str)
         hda_df.columns = [c.strip().upper() for c in hda_df.columns]
-        if "PLANT" not in hda_df.columns:
-            raise ValueError("PLANT column not found in HDA.tab.")
-        self.hda_plants = set(hda_df["PLANT"].dropna().str.strip().tolist())
-        print(f"    HDA.tab     – PLANT values loaded        : {len(self.hda_plants)}")
+        if "SOLDTOPARTY" not in hda_df.columns:
+            raise ValueError("SOLDTOPARTY column not found in HDA.tab.")
+        self.hda_plants = set(hda_df["SOLDTOPARTY"].dropna().str.strip().tolist())
+        print(f"    HDA.tab     – SOLDTOPARTY values loaded  : {len(self.hda_plants)}")
 
-        # ── IndependentDemand.tab → PRODUCTIONPLANT column for CUSTOMER rule
+        # ── IndependentDemand.tab → SOLDTOPARTY column for CUSTOMER rule ─
         ind_df = pd.read_csv(self.ind_demand_path, sep="\t", dtype=str)
         ind_df.columns = [c.strip().upper() for c in ind_df.columns]
-        if "PRODUCTIONPLANT" not in ind_df.columns:
-            raise ValueError("PRODUCTIONPLANT column not found in IndependentDemand.tab.")
-        self.ind_demand_plants = set(ind_df["PRODUCTIONPLANT"].dropna().str.strip().tolist())
-        print(f"    IndependentDemand.tab – PRODUCTIONPLANT  : {len(self.ind_demand_plants)}")
+        if "SOLDTOPARTY" not in ind_df.columns:
+            raise ValueError("SOLDTOPARTY column not found in IndependentDemand.tab.")
+        self.ind_demand_plants = set(ind_df["SOLDTOPARTY"].dropna().str.strip().tolist())
+        print(f"    IndependentDemand.tab – SOLDTOPARTY      : {len(self.ind_demand_plants)}")
 
     def validate(self):
         engine = CustomerRuleEngine(
