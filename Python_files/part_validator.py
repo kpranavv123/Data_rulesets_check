@@ -103,12 +103,16 @@ class RuleEngine:
         return self._check_not_blank(row.get("ABCINDICATOR"))
 
     def validate_ibp_status(self, row) -> bool:
-        val = str(row.get("IBPSTATUS", "")).strip().upper()
-        return val in {"IBP", ""}
+     raw = row.get("IBPSTATUS")
+     if self._is_blank(raw):
+        return True          # blank is allowed → no error
+     return str(raw).strip().upper() == "IBP"
 
     def validate_xplant_mat_status(self, row) -> bool:
-        val = str(row.get("XPLANTMATSTATUS", "")).strip()
-        return val in {"2", ""}
+     raw = row.get("XPLANTMATSTATUS")
+     if self._is_blank(raw):
+        return True          # blank is allowed → no error
+     return str(raw).strip() == "2"
 
     # map: column name → validator method
     def get_rules(self) -> dict:
@@ -299,7 +303,7 @@ class PartTableProcessor:
 if __name__ == "__main__":
 
     INPUT_FILE  = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Excel_Files/Part.xlsx"   # ← change this
-    OUTPUT_FILE = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Validated_Part.xlsx"  # ← change this
+    OUTPUT_FILE = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Output_Files/Validated_Part.xlsx"  # ← change this
 
     processor = PartTableProcessor(
         input_path   = INPUT_FILE,

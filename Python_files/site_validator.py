@@ -9,7 +9,7 @@ from openpyxl.utils import get_column_letter
 # ─────────────────────────────────────────────
 SITE_INPUT_FILE  = r"D:\SEM-8\Data Rules Set Check\Data_rulesets_check\Excel_Files\Site.xlsx"
 PART_INPUT_FILE  = r"D:\SEM-8\Data Rules Set Check\Data_rulesets_check\Excel_Files\Part.xlsx"
-OUTPUT_FILE      = r"D:\SEM-8\Data Rules Set Check\Data_rulesets_check\Validated_Site.xlsx"
+OUTPUT_FILE      = r"D:\SEM-8\Data Rules Set Check\Data_rulesets_check\Output_filesValidated_Site.xlsx"
 
 
 # ─────────────────────────────────────────────
