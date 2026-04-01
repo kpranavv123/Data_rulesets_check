@@ -1,12 +1,18 @@
 import pandas as pd
-from openpyxl import load_workbook
+from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font
 from openpyxl.utils import get_column_letter
 
 
+# ─────────────────────────────────────────────
+#  FILE PATHS  –  update these
+# ─────────────────────────────────────────────
+INPUT_FILE  = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Excel_Files/Part.xlsx"
+OUTPUT_FILE = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Validated_Part.xlsx"
+
 
 # ─────────────────────────────────────────────
-#  >>>  ADD YOUR VALID PLANT VALUES HERE  <<<
+#  CONSOLIDATED PL LIST
 # ─────────────────────────────────────────────
 VALID_PLANTS = [
     "1127", "1100", "1105", "1146", "1156", "1107", "1157", "1158", "1166", "1180",
@@ -33,14 +39,15 @@ VALID_PLANTS = [
 ]
 
 
-# ──────────────────────────────────────────────
+# ─────────────────────────────────────────────
 #  Colours
-# ──────────────────────────────────────────────
-RED_FILL   = PatternFill("solid", start_color="FF0000", end_color="FF0000")
-ROW_FILL   = PatternFill("solid", start_color="FFF2CC", end_color="FFF2CC")   # light yellow
-HDR_FILL   = PatternFill("solid", start_color="D9E1F2", end_color="D9E1F2")   # light blue header
-HDR_FONT   = Font(bold=True, name="Arial")
-BODY_FONT  = Font(name="Arial", size=10)
+# ─────────────────────────────────────────────
+RED_FILL  = PatternFill("solid", start_color="FF0000", end_color="FF0000")
+ROW_FILL  = PatternFill("solid", start_color="FFF2CC", end_color="FFF2CC")
+HDR_FILL  = PatternFill("solid", start_color="D9E1F2", end_color="D9E1F2")
+HDR_FONT  = Font(bold=True, name="Arial")
+BODY_FONT = Font(name="Arial", size=10)
+ERR_FONT  = Font(name="Arial", size=10, bold=True, color="FFFFFF")
 
 
 # ══════════════════════════════════════════════
@@ -52,7 +59,6 @@ class RuleEngine:
     def __init__(self, valid_plants: list):
         self.valid_plants = [str(p).strip() for p in valid_plants]
 
-    # helpers
     @staticmethod
     def _is_blank(value) -> bool:
         return pd.isna(value) or str(value).strip() == ""
@@ -60,7 +66,6 @@ class RuleEngine:
     def _check_not_blank(self, value) -> bool:
         return not self._is_blank(value)
 
-    # individual column validators  →  return True = PASS, False = FAIL
     def validate_material_number(self, row) -> bool:
         mat   = row.get("MATERIALNUMBER")
         ptype = str(row.get("PRODUCTTYPE", "")).strip().upper()
@@ -103,44 +108,43 @@ class RuleEngine:
         return self._check_not_blank(row.get("ABCINDICATOR"))
 
     def validate_ibp_status(self, row) -> bool:
-     raw = row.get("IBPSTATUS")
-     if self._is_blank(raw):
-        return True          # blank is allowed → no error
-     return str(raw).strip().upper() == "IBP"
+        raw = row.get("IBPSTATUS")
+        if self._is_blank(raw):
+            return True
+        return str(raw).strip().upper() == "IBP"
 
     def validate_xplant_mat_status(self, row) -> bool:
-     raw = row.get("XPLANTMATSTATUS")
-     if self._is_blank(raw):
-        return True          # blank is allowed → no error
-     return str(raw).strip() == "2"
+        raw = row.get("XPLANTMATSTATUS")
+        if self._is_blank(raw):
+            return True
+        return str(raw).strip() == "2"
 
-    # map: column name → validator method
     def get_rules(self) -> dict:
         return {
-            "MATERIALNUMBER":    self.validate_material_number,
-            "PLANT":             self.validate_plant,
-            "PRODUCTDESCRIPTION":self.validate_product_description,
-            "PRODUCTTYPE":       self.validate_product_type,
-            "PRODUCTHIERARCHY":  self.validate_product_hierarchy,
-            "MRPTYPE":           self.validate_mrp_type,
-            "PROCUREMENTTYPE":   self.validate_procurement_type,
-            "ABCINDICATOR":      self.validate_abc_indicator,
-            "IBPSTATUS":         self.validate_ibp_status,
-            "XPLANTMATSTATUS":   self.validate_xplant_mat_status,
+            "MATERIALNUMBER":     self.validate_material_number,
+            "PLANT":              self.validate_plant,
+            "PRODUCTDESCRIPTION": self.validate_product_description,
+            "PRODUCTTYPE":        self.validate_product_type,
+            "PRODUCTHIERARCHY":   self.validate_product_hierarchy,
+            "MRPTYPE":            self.validate_mrp_type,
+            "PROCUREMENTTYPE":    self.validate_procurement_type,
+            "ABCINDICATOR":       self.validate_abc_indicator,
+            "IBPSTATUS":          self.validate_ibp_status,
+            "XPLANTMATSTATUS":    self.validate_xplant_mat_status,
         }
 
 
 # ══════════════════════════════════════════════
-#  Validator  –  runs rules on the DataFrame
+#  Validator
 # ══════════════════════════════════════════════
 class PartTableValidator:
     """Reads the Excel file, applies rules, and produces an error map."""
 
     def __init__(self, filepath: str, valid_plants: list):
-        self.filepath     = filepath
-        self.engine       = RuleEngine(valid_plants)
-        self.df           = pd.DataFrame()
-        self.error_map    = {}        # {row_index: [col_name, ...]}
+        self.filepath  = filepath
+        self.engine    = RuleEngine(valid_plants)
+        self.df        = pd.DataFrame()
+        self.error_map = {}
 
     def load(self):
         self.df = pd.read_excel(self.filepath, dtype=str)
@@ -162,117 +166,146 @@ class PartTableValidator:
             if failed_cols:
                 self.error_map[idx] = failed_cols
 
-    def get_error_summary(self) -> pd.Series:
-        """Returns a Series aligned to df index with comma-joined error columns."""
-        return pd.Series({
-            idx: ", ".join(cols)
-            for idx, cols in self.error_map.items()
-        }, dtype=str)
+    def get_error_series(self) -> pd.Series:
+        return pd.Series(
+            {idx: ", ".join(cols) for idx, cols in self.error_map.items()},
+            dtype=str
+        )
 
 
 # ══════════════════════════════════════════════
-#  Report Writer  –  builds the output workbook
+#  Report Writer
 # ══════════════════════════════════════════════
 class ReportWriter:
-    """Writes the validated data to an output Excel workbook with 2 sheets."""
+    """Writes the validated data to an output Excel workbook with 3 sheets."""
 
-    SHEET_ALL    = "Full Data"
-    SHEET_ERRORS = "Error Rows"
+    SHEET_ALL     = "Full Data"
+    SHEET_ERRORS  = "Error Rows"
+    SHEET_SUMMARY = "Summary"
 
     def __init__(self, validator: PartTableValidator, output_path: str):
         self.validator   = validator
         self.output_path = output_path
 
-    # ── internal helpers ──────────────────────
-    def _write_dataframe_to_sheet(self, ws, df: pd.DataFrame):
-        """Writes DataFrame (with header) into a worksheet."""
-        for c_idx, col_name in enumerate(df.columns, start=1):
+    def _write_header(self, ws, columns):
+        for c_idx, col_name in enumerate(columns, start=1):
             cell = ws.cell(row=1, column=c_idx, value=col_name)
             cell.fill = HDR_FILL
             cell.font = HDR_FONT
 
+    def _write_rows(self, ws, df: pd.DataFrame):
         for r_idx, (_, row) in enumerate(df.iterrows(), start=2):
             for c_idx, value in enumerate(row, start=1):
                 cell = ws.cell(row=r_idx, column=c_idx, value=value)
                 cell.font = BODY_FONT
 
-    def _apply_highlights(self, ws, df: pd.DataFrame, error_map: dict, col_index: dict):
-        """
-        Highlights error rows with light yellow and individual error cells with red.
-        df_row_idx (0-based) → excel_row = df_row_idx + 2  (accounting for header)
-        """
+    def _highlight(self, ws, df: pd.DataFrame, error_map: dict, col_index: dict):
         for df_idx, bad_cols in error_map.items():
-            excel_row = df_idx + 2          # +1 header, +1 because openpyxl is 1-based
+            excel_row  = df_idx + 2
             total_cols = len(df.columns)
-
-            # light-yellow entire row
             for c in range(1, total_cols + 1):
                 ws.cell(row=excel_row, column=c).fill = ROW_FILL
-
-            # red on specific error cells
             for col_name in bad_cols:
                 if col_name in col_index:
-                    ws.cell(row=excel_row, column=col_index[col_name]).fill = RED_FILL
-                    ws.cell(row=excel_row, column=col_index[col_name]).font = Font(
-                        name="Arial", size=10, bold=True, color="FFFFFF"
-                    )
+                    cell = ws.cell(row=excel_row, column=col_index[col_name])
+                    cell.fill = RED_FILL
+                    cell.font = ERR_FONT
 
-    def _set_column_widths(self, ws):
+    def _set_widths(self, ws):
         for col in ws.columns:
             max_len = max((len(str(c.value)) if c.value else 0) for c in col)
             ws.column_dimensions[get_column_letter(col[0].column)].width = min(max_len + 4, 50)
 
-    # ── public ───────────────────────────────
+    def _write_summary_sheet(self, wb, error_map: dict):
+        ws = wb.create_sheet(self.SHEET_SUMMARY)
+
+        # Title
+        ws.cell(row=1, column=1, value="Summary Output").font = Font(name="Arial", bold=True, size=13)
+        ws.cell(row=1, column=2, value="In one sheet - Summary").font = Font(name="Arial", size=10)
+
+        # Header
+        hdr_fill = PatternFill("solid", start_color="BDD7EE", end_color="BDD7EE")
+        for c_idx, h in enumerate(["Extract", "Field", "Count of Errors"], start=1):
+            cell = ws.cell(row=3, column=c_idx, value=h)
+            cell.fill = hdr_fill
+            cell.font = Font(name="Arial", bold=True)
+
+        # Count errors per column
+        col_error_counts = {}
+        for bad_cols in error_map.values():
+            for col in bad_cols:
+                col_error_counts[col] = col_error_counts.get(col, 0) + 1
+
+        # Data rows
+        row_num = 4
+        total   = 0
+        for col_name, count in col_error_counts.items():
+            ws.cell(row=row_num, column=1, value="Part").font = BODY_FONT
+            ws.cell(row=row_num, column=2, value=col_name).font = BODY_FONT
+            ws.cell(row=row_num, column=3, value=count).font = BODY_FONT
+            total   += count
+            row_num += 1
+
+        # Total row
+        total_fill = PatternFill("solid", start_color="F2F2F2", end_color="F2F2F2")
+        ws.cell(row=row_num, column=2, value="Total").font = Font(name="Arial", bold=True)
+        ws.cell(row=row_num, column=3, value=total).font = Font(name="Arial", bold=True)
+        for c in range(1, 4):
+            ws.cell(row=row_num, column=c).fill = total_fill
+
+        # Note
+        ws.cell(
+            row=row_num + 2, column=1,
+            value="Each field will have a separate sheet displaying all rows with errors"
+        ).font = Font(name="Arial", italic=True, size=9)
+
+        ws.column_dimensions["A"].width = 14
+        ws.column_dimensions["B"].width = 28
+        ws.column_dimensions["C"].width = 18
+
     def write(self):
         v      = self.validator
         df     = v.df.copy()
         errors = v.error_map
 
-        # add ERROR_COLUMNS summary column
-        error_series = v.get_error_summary()
-        df["ERROR_COLUMNS"] = df.index.map(lambda i: error_series.get(i, ""))
-
-        # build column → excel-column-index map (1-based)
+        df["ERROR_COLUMNS"] = df.index.map(lambda i: v.get_error_series().get(i, ""))
         col_index = {col: i for i, col in enumerate(df.columns, start=1)}
+        error_df  = df[df.index.isin(errors.keys())].copy()
 
-        # error-only rows (preserve original row numbers via index)
-        error_df = df[df.index.isin(errors.keys())].copy()
-
-        # ── write both sheets ─────────────────
-        # We write via openpyxl directly for formatting control
-        from openpyxl import Workbook
         wb = Workbook()
 
-        # Sheet 1: Full Data
+        # ── Sheet 1: Full Data ────────────────
         ws_all = wb.active
         ws_all.title = self.SHEET_ALL
-        self._write_dataframe_to_sheet(ws_all, df)
-        self._apply_highlights(ws_all, df, errors, col_index)
-        self._set_column_widths(ws_all)
+        self._write_header(ws_all, df.columns)
+        self._write_rows(ws_all, df)
+        self._highlight(ws_all, df, errors, col_index)
+        self._set_widths(ws_all)
 
-        # Sheet 2: Error Rows only
+        # ── Sheet 2: Error Rows ───────────────
         ws_err = wb.create_sheet(self.SHEET_ERRORS)
-        self._write_dataframe_to_sheet(ws_err, error_df)
-
-        # re-map errors to error_df sequential positions for sheet 2
+        self._write_header(ws_err, error_df.columns)
+        self._write_rows(ws_err, error_df)
         err_col_idx = {col: i for i, col in enumerate(error_df.columns, start=1)}
         for sheet2_row, orig_idx in enumerate(error_df.index, start=2):
-            bad_cols = errors[orig_idx]
+            bad_cols   = errors[orig_idx]
             total_cols = len(error_df.columns)
             for c in range(1, total_cols + 1):
                 ws_err.cell(row=sheet2_row, column=c).fill = ROW_FILL
             for col_name in bad_cols:
                 if col_name in err_col_idx:
-                    ws_err.cell(row=sheet2_row, column=err_col_idx[col_name]).fill = RED_FILL
-                    ws_err.cell(row=sheet2_row, column=err_col_idx[col_name]).font = Font(
-                        name="Arial", size=10, bold=True, color="FFFFFF"
-                    )
+                    cell = ws_err.cell(row=sheet2_row, column=err_col_idx[col_name])
+                    cell.fill = RED_FILL
+                    cell.font = ERR_FONT
+        self._set_widths(ws_err)
 
-        self._set_column_widths(ws_err)
+        # ── Sheet 3: Summary ──────────────────
+        self._write_summary_sheet(wb, errors)
+
         wb.save(self.output_path)
-        print(f"\n✅  Output saved → {self.output_path}")
-        print(f"   Total rows     : {len(df)}")
-        print(f"   Error rows     : {len(error_df)}")
+        print(f"\n✅  Output saved  → {self.output_path}")
+        print(f"   Total rows    : {len(df)}")
+        print(f"   Error rows    : {len(error_df)}")
 
 
 # ══════════════════════════════════════════════
@@ -288,11 +321,9 @@ class PartTableProcessor:
     def run(self):
         print("📂  Loading file …")
         self.validator.load()
-        print(f"    Columns detected: {list(self.validator.df.columns)}")
-
+        print(f"    Columns detected : {list(self.validator.df.columns)}")
         print("🔍  Validating rules …")
         self.validator.validate()
-
         print("📝  Writing report …")
         self.writer.write()
 
@@ -301,10 +332,6 @@ class PartTableProcessor:
 #  Entry Point
 # ══════════════════════════════════════════════
 if __name__ == "__main__":
-
-    INPUT_FILE  = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Excel_Files/Part.xlsx"   # ← change this
-    OUTPUT_FILE = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Output_Files/Validated_Part.xlsx"  # ← change this
-
     processor = PartTableProcessor(
         input_path   = INPUT_FILE,
         output_path  = OUTPUT_FILE,

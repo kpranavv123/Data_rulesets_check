@@ -7,9 +7,9 @@ from openpyxl.utils import get_column_letter
 # ─────────────────────────────────────────────
 #  FILE PATHS  –  update these
 # ─────────────────────────────────────────────
-SITE_INPUT_FILE  = r"D:\SEM-8\Data Rules Set Check\Data_rulesets_check\Excel_Files\Site.xlsx"
-PART_INPUT_FILE  = r"D:\SEM-8\Data Rules Set Check\Data_rulesets_check\Excel_Files\Part.xlsx"
-OUTPUT_FILE      = r"D:\SEM-8\Data Rules Set Check\Data_rulesets_check\Output_filesValidated_Site.xlsx"
+SITE_INPUT_FILE  = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Excel_Files/Site.xlsx"
+PART_INPUT_FILE  = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Excel_Files/Part.xlsx"
+OUTPUT_FILE      = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Validated_Site.xlsx"
 
 
 # ─────────────────────────────────────────────
@@ -69,9 +69,7 @@ class SiteRuleEngine:
         val = str(row.get("PLANT", "")).strip()
         if not val:
             return False
-        in_pl_list  = val in self.valid_plants
-        in_part_tbl = val in self.part_plants
-        return in_pl_list and in_part_tbl
+        return val in self.valid_plants and val in self.part_plants
 
     def validate_name(self, row) -> bool:
         return not self._is_blank(row.get("NAME"))
@@ -98,11 +96,12 @@ class SiteTableValidator:
     """Loads Site & Part Excel files, runs validation, builds error map."""
 
     def __init__(self, site_path: str, part_path: str, valid_plants: list):
-        self.site_path   = site_path
-        self.part_path   = part_path
+        self.site_path    = site_path
+        self.part_path    = part_path
         self.valid_plants = valid_plants
-        self.df          = pd.DataFrame()
-        self.error_map   = {}
+        self.df           = pd.DataFrame()
+        self.part_plants  = set()
+        self.error_map    = {}
 
     def load(self):
         self.df = pd.read_excel(self.site_path, dtype=str)
@@ -120,7 +119,6 @@ class SiteTableValidator:
     def validate(self):
         engine = SiteRuleEngine(self.valid_plants, self.part_plants)
         rules  = engine.get_rules()
-
         for idx, row in self.df.iterrows():
             failed = []
             for col, rule_fn in rules.items():
@@ -146,10 +144,11 @@ class SiteTableValidator:
 #  Report Writer
 # ══════════════════════════════════════════════
 class SiteReportWriter:
-    """Builds the 2-sheet output Excel with colour highlights."""
+    """Builds the 3-sheet output Excel with colour highlights and summary."""
 
-    SHEET_ALL    = "Full Data"
-    SHEET_ERRORS = "Error Rows"
+    SHEET_ALL     = "Full Data"
+    SHEET_ERRORS  = "Error Rows"
+    SHEET_SUMMARY = "Summary"
 
     def __init__(self, validator: SiteTableValidator, output_path: str):
         self.validator   = validator
@@ -184,6 +183,53 @@ class SiteReportWriter:
             max_len = max((len(str(c.value)) if c.value else 0) for c in col)
             ws.column_dimensions[get_column_letter(col[0].column)].width = min(max_len + 4, 50)
 
+    def _write_summary_sheet(self, wb, error_map: dict):
+        ws = wb.create_sheet(self.SHEET_SUMMARY)
+
+        # Title
+        ws.cell(row=1, column=1, value="Summary Output").font = Font(name="Arial", bold=True, size=13)
+        ws.cell(row=1, column=2, value="In one sheet - Summary").font = Font(name="Arial", size=10)
+
+        # Header
+        hdr_fill = PatternFill("solid", start_color="BDD7EE", end_color="BDD7EE")
+        for c_idx, h in enumerate(["Extract", "Field", "Count of Errors"], start=1):
+            cell = ws.cell(row=3, column=c_idx, value=h)
+            cell.fill = hdr_fill
+            cell.font = Font(name="Arial", bold=True)
+
+        # Count errors per column
+        col_error_counts = {}
+        for bad_cols in error_map.values():
+            for col in bad_cols:
+                col_error_counts[col] = col_error_counts.get(col, 0) + 1
+
+        # Data rows
+        row_num = 4
+        total   = 0
+        for col_name, count in col_error_counts.items():
+            ws.cell(row=row_num, column=1, value="Site").font = BODY_FONT
+            ws.cell(row=row_num, column=2, value=col_name).font = BODY_FONT
+            ws.cell(row=row_num, column=3, value=count).font = BODY_FONT
+            total   += count
+            row_num += 1
+
+        # Total row
+        total_fill = PatternFill("solid", start_color="F2F2F2", end_color="F2F2F2")
+        ws.cell(row=row_num, column=2, value="Total").font = Font(name="Arial", bold=True)
+        ws.cell(row=row_num, column=3, value=total).font = Font(name="Arial", bold=True)
+        for c in range(1, 4):
+            ws.cell(row=row_num, column=c).fill = total_fill
+
+        # Note
+        ws.cell(
+            row=row_num + 2, column=1,
+            value="Each field will have a separate sheet displaying all rows with errors"
+        ).font = Font(name="Arial", italic=True, size=9)
+
+        ws.column_dimensions["A"].width = 14
+        ws.column_dimensions["B"].width = 28
+        ws.column_dimensions["C"].width = 18
+
     def write(self):
         v  = self.validator
         df = v.df.copy()
@@ -206,7 +252,6 @@ class SiteReportWriter:
         ws_err = wb.create_sheet(self.SHEET_ERRORS)
         self._write_header(ws_err, error_df.columns)
         self._write_rows(ws_err, error_df)
-
         err_col_idx = {col: i for i, col in enumerate(error_df.columns, start=1)}
         for sheet2_row, orig_idx in enumerate(error_df.index, start=2):
             bad_cols   = v.error_map[orig_idx]
@@ -218,10 +263,12 @@ class SiteReportWriter:
                     cell = ws_err.cell(row=sheet2_row, column=err_col_idx[col_name])
                     cell.fill = RED_FILL
                     cell.font = ERR_FONT
-
         self._set_widths(ws_err)
-        wb.save(self.output_path)
 
+        # ── Sheet 3: Summary ──────────────────
+        self._write_summary_sheet(wb, v.error_map)
+
+        wb.save(self.output_path)
         print(f"\n✅  Output saved  → {self.output_path}")
         print(f"   Total rows    : {len(df)}")
         print(f"   Error rows    : {len(error_df)}")
@@ -241,10 +288,8 @@ class SiteTableProcessor:
         print("📂  Loading files …")
         self.validator.load()
         print(f"    Site columns detected : {list(self.validator.df.columns)}")
-
         print("🔍  Validating rules …")
         self.validator.validate()
-
         print("📝  Writing report …")
         self.writer.write()
 
@@ -254,9 +299,9 @@ class SiteTableProcessor:
 # ══════════════════════════════════════════════
 if __name__ == "__main__":
     processor = SiteTableProcessor(
-        site_path   = SITE_INPUT_FILE,
-        part_path   = PART_INPUT_FILE,
-        output_path = OUTPUT_FILE,
-        valid_plants= VALID_PLANTS,
+        site_path    = SITE_INPUT_FILE,
+        part_path    = PART_INPUT_FILE,
+        output_path  = OUTPUT_FILE,
+        valid_plants = VALID_PLANTS,
     )
     processor.run()
