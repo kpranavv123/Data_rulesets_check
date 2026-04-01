@@ -7,8 +7,8 @@ from openpyxl.utils import get_column_letter
 # ─────────────────────────────────────────────
 #  FILE PATHS  –  update these
 # ─────────────────────────────────────────────
-INPUT_FILE  = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Excel_Files/Part.xlsx"
-OUTPUT_FILE = r"D:/SEM-8/Data Rules Set Check/Data_rulesets_check/Validated_Part.xlsx"
+INPUT_FILE  = r"C:\Users\SW526XH\Downloads\Data Quality Check\Excel_Files\Part.xlsx"
+OUTPUT_FILE = r"C:\Users\SW526XH\Downloads\Data Quality Check\Output_Files\Validated_Part.xlsx"
 
 
 # ─────────────────────────────────────────────
