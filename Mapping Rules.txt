@@ -60,7 +60,44 @@ Customer Table Mapping:
 
 6)SALESORGANIZATION--Should not be blank
 
-7)All the other feilds also same --Should not be blank
+7)CUSTOMERGROUP1--should not be blank
+
+8)CUSTOMERGROUP1_NAME--should not be blank
+
+9)COUNTRY_CODE--should not be blank
+
+10)COUNTRY_NAME--should not be blank
+
+11)CHANNEL_CODE--should not be blank
+
+12)GLOBAL_CHANNEL_NAME--should not be blank
+
+13)CHANNEL--should not be blank
+
+14)CHANNEL_DESCRIPTION--should not be blank
+
+15)DIVISION--should not be blank
+
+16)DIVISIONDESCRIPTION--should not be blank
+
+17)SUB_CHANNEL_CODE_JDA_REPORTING--should not be blank
+
+18)SUB_CHANNEL_DESC_JDA_REPORTING--should not be blank
+
+19)REGION_CODE--should not be blank
+
+20)REGION_NAME--should not be blank
+
+21)ASM_CODE--should not be blank
+
+22)AREA_NAME--should not be blank
+
+23)MARKET_CODE--should not be blank
+24)MARKET_NAME	--should not be blank
+25)CLUSTER_MANAGER_CODE	--should not be blank
+26)CM_NAME--should not be blank	
+27)SALESHIERARCHY--should not be blank
+
 
 
 Historical Demand Actuals Mapping:
