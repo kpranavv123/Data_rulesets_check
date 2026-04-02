@@ -27,8 +27,9 @@
 
 import pandas as pd
 
-# Read the .tab file
-df = pd.read_csv('your_file.tab', sep='\t')
+# Read only the 4 required columns from the .tab file
+cols = ["MATERIAL", "PLANT", "SOLDTOPART", "BILLING_WEEK_START"]
+df = pd.read_csv('your_file.tab', sep='\t', usecols=cols)
 
 # Split into chunks of 10 lakh rows (1,000,000) per sheet
 chunk_size = 1_000_000
