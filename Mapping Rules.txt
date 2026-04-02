@@ -102,12 +102,12 @@ Customer Table Mapping:
 
 Historical Demand Actuals Mapping:
 
-1)MATERIAL column should be present in Part Table,so find it in MATERIALNUMBER
 
-2)PLANT column should be preent in Site table,find it in PLANT column of Site table
+1)MATERIAL: MATERIAL column and PLANT column of HDA table shouldd be present in Part excel sheet of MATERIALNUMBER and PLANT column and should not be blank
 
-Doubt-3)Customer column (which column to match in Historical Demand Actuals)
+2)PLANT column of HDA excel should be present in Site excel,find it in PLANT column of Site excel
 
+3)SOLDTOPARTY:PLANT and SOLDTOPARTY column of HDA  has to present in SUPPLYINGPLANT and CUSTOMER columns of CUSTOMER excel  
 
 4)BILLING_WEEK_START column should be YYYYMMDD format and should not be blank
 
