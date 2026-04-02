@@ -46,14 +46,14 @@ VALID_COMPANY_CODES = {"1001", "1006", "1009"}
 # ─────────────────────────────────────────────
 #  Colours
 # ─────────────────────────────────────────────
-RED_FILL   = PatternFill("solid", start_color="FF0000", end_color="FF0000")
-ROW_FILL   = PatternFill("solid", start_color="FFF2CC", end_color="FFF2CC")
-HDR_FILL   = PatternFill("solid", start_color="D9E1F2", end_color="D9E1F2")
-RULE_FILL  = PatternFill("solid", start_color="E2EFDA", end_color="E2EFDA")
-TITLE_FILL = PatternFill("solid", start_color="BDD7EE", end_color="BDD7EE")
-HDR_FONT   = Font(bold=True, name="Arial")
-BODY_FONT  = Font(name="Arial", size=10)
-ERR_FONT   = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+RED_FILL    = PatternFill("solid", start_color="FF0000", end_color="FF0000")
+ROW_FILL    = PatternFill("solid", start_color="FFF2CC", end_color="FFF2CC")
+HDR_FILL    = PatternFill("solid", start_color="D9E1F2", end_color="D9E1F2")
+RULE_FILL   = PatternFill("solid", start_color="E2EFDA", end_color="E2EFDA")
+TITLE_FILL  = PatternFill("solid", start_color="BDD7EE", end_color="BDD7EE")
+HDR_FONT    = Font(bold=True, name="Arial")
+BODY_FONT   = Font(name="Arial", size=10)
+ERR_FONT    = Font(name="Arial", size=10, bold=True, color="FFFFFF")
 THIN_BORDER = Border(
     left=Side(style="thin"), right=Side(style="thin"),
     top=Side(style="thin"),  bottom=Side(style="thin"),
@@ -61,10 +61,15 @@ THIN_BORDER = Border(
 
 
 # ══════════════════════════════════════════════
-#  Rule Engine
+#  Rule Engine  (returns failure reason strings)
 # ══════════════════════════════════════════════
 class SiteRuleEngine:
-    """All column-level validation rules for the Site Table."""
+    """
+    All column-level validation rules for the Site Table.
+    Each validate_* method returns either:
+      - None / empty string  → PASS
+      - A short reason string → FAIL  (used verbatim in ERROR_COLUMNS)
+    """
 
     def __init__(self, valid_plants: list, part_plants: set):
         self.valid_plants = set(str(p).strip() for p in valid_plants)
@@ -75,38 +80,49 @@ class SiteRuleEngine:
         return pd.isna(value) or str(value).strip() == ""
 
     # ─ Rule 1: PLANT ─
-    # Must not be blank AND present in Consolidated PL list
-    # AND must have an active part-site combination in Part master (PLANT column)
-    def validate_plant(self, row) -> bool:
+    # Three sub-conditions checked in priority order:
+    #   1a. Must not be blank
+    #   1b. Must be present in Consolidated PL list
+    #   1c. Must have an active part-site combination in Part master
+    def validate_plant(self, row) -> str:
         val = str(row.get("PLANT", "")).strip()
-        if not val:
-            return False
-        return val in self.valid_plants and val in self.part_plants
+        if not val or val == "nan":
+            return "PLANT: Field is blank — plant code is mandatory"
+        if val not in self.valid_plants:
+            return f"PLANT: '{val}' is not present in the Consolidated PL list"
+        if val not in self.part_plants:
+            return f"PLANT: '{val}' has no active Part-Site combination in the Part master table"
+        return ""   # PASS
 
     # ─ Rule 2: NAME ─
-    # Must not be blank
-    def validate_name(self, row) -> bool:
-        return not self._is_blank(row.get("NAME"))
+    def validate_name(self, row) -> str:
+        if self._is_blank(row.get("NAME")):
+            return "NAME: Field is blank — site name is mandatory"
+        return ""
 
     # ─ Rule 3: ADDRESS ─
-    # Must not be blank
-    def validate_address(self, row) -> bool:
-        return not self._is_blank(row.get("ADDRESS"))
+    def validate_address(self, row) -> str:
+        if self._is_blank(row.get("ADDRESS")):
+            return "ADDRESS: Field is blank — address is mandatory"
+        return ""
 
     # ─ Rule 4: TCPL_PLANTTYPE ─
-    # Must not be blank
-    def validate_tcpl_planttype(self, row) -> bool:
-        return not self._is_blank(row.get("TCPL_PLANTTYPE"))
+    def validate_tcpl_planttype(self, row) -> str:
+        if self._is_blank(row.get("TCPL_PLANTTYPE")):
+            return "TCPL_PLANTTYPE: Field is blank — plant type is mandatory"
+        return ""
 
     # ─ Rule 5: COMPANYCODE ─
-    # Must not be blank AND value must be one of: 1001 / 1006 / 1009
-    def validate_companycode(self, row) -> bool:
+    def validate_companycode(self, row) -> str:
         val = row.get("COMPANYCODE", None)
         if self._is_blank(val):
-            return False
-        return str(val).strip() in VALID_COMPANY_CODES
+            return "COMPANYCODE: Field is blank — company code is mandatory"
+        if str(val).strip() not in VALID_COMPANY_CODES:
+            return f"COMPANYCODE: '{str(val).strip()}' is invalid — must be one of 1001 / 1006 / 1009"
+        return ""
 
     def get_rules(self) -> dict:
+        """Returns { column_name: validate_fn } mapping."""
         return {
             "PLANT":          self.validate_plant,
             "NAME":           self.validate_name,
@@ -128,7 +144,8 @@ class SiteTableValidator:
         self.valid_plants = valid_plants
         self.df           = pd.DataFrame()
         self.part_plants  = set()
-        self.error_map    = {}   # { row_idx: [col, col, ...] }
+        self.error_map    = {}   # { row_idx: [col, col, ...] }  — col names only (for highlights)
+        self.reason_map   = {}   # { row_idx: [reason_str, ...] } — full descriptions (for ERROR_COLUMNS)
 
     def load(self):
         self.df = pd.read_excel(self.site_path, dtype=str)
@@ -146,25 +163,36 @@ class SiteTableValidator:
     def validate(self):
         engine = SiteRuleEngine(self.valid_plants, self.part_plants)
         rules  = engine.get_rules()
+
         for idx, row in self.df.iterrows():
-            failed = []
+            failed_cols   = []
+            failed_reasons = []
+
             for col, rule_fn in rules.items():
                 if col not in self.df.columns:
                     continue
                 try:
-                    passed = rule_fn(row)
+                    reason = rule_fn(row)   # empty string = pass, non-empty = fail
                 except Exception:
-                    passed = False
-                if not passed:
-                    failed.append(col)
-            if failed:
-                self.error_map[idx] = failed
+                    reason = f"{col}: Unexpected validation error"
+
+                if reason:                  # non-empty → failure
+                    failed_cols.append(col)
+                    failed_reasons.append(reason)
+
+            if failed_cols:
+                self.error_map[idx]  = failed_cols
+                self.reason_map[idx] = failed_reasons
 
     def get_error_series(self) -> pd.Series:
-        return pd.Series(
-            {idx: ", ".join(cols) for idx, cols in self.error_map.items()},
-            dtype=str,
-        )
+        """
+        Returns a Series of pipe-separated, human-readable reason strings per row.
+        Used to populate the ERROR_COLUMNS field in Full Data sheet.
+        """
+        result = {}
+        for idx, reasons in self.reason_map.items():
+            result[idx] = " | ".join(reasons)
+        return pd.Series(result, dtype=str)
 
     def get_errors_by_field(self) -> dict:
         """Returns { field_name: [row_idx, ...] } — rows that failed that specific field."""
@@ -187,7 +215,6 @@ class SiteReportWriter:
     SHEET_SUMMARY = "Summary"
     SHEET_RULES   = "Rules"
 
-    # Rules sheet content  { field: [rule line, ...] }
     RULES_CONTENT = {
         "PLANT": [
             "Must not be blank.",
@@ -241,78 +268,120 @@ class SiteReportWriter:
     def _set_widths(self, ws):
         for col in ws.columns:
             max_len = max((len(str(c.value)) if c.value else 0) for c in col)
-            ws.column_dimensions[get_column_letter(col[0].column)].width = min(max_len + 4, 50)
+            ws.column_dimensions[get_column_letter(col[0].column)].width = min(max_len + 4, 60)
 
-    # ── Summary sheet ─────────────────────────
-    def _write_summary_sheet(self, wb, error_map: dict):
+    # ── Summary sheet (matches Part validation format) ────────────────────
+    def _write_summary_sheet(self, wb, error_map: dict, total_rows: int):
         ws = wb.create_sheet(self.SHEET_SUMMARY)
 
-        ws.cell(row=1, column=1, value="Summary Output").font = Font(name="Arial", bold=True, size=13)
-        ws.cell(row=1, column=2, value="In one sheet - Summary").font = Font(name="Arial", size=10)
+        # ── Title ──
+        title_cell = ws.cell(row=1, column=1, value="Site Validation Summary")
+        title_cell.font = Font(name="Arial", bold=True, size=14)
+        title_cell.fill = TITLE_FILL
+        title_cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws.merge_cells("A1:E1")
+        ws.row_dimensions[1].height = 24
 
-        hdr_fill = PatternFill("solid", start_color="BDD7EE", end_color="BDD7EE")
-        for c_idx, h in enumerate(["Extract", "Field", "Count of Errors"], start=1):
+        # ── Column headers ──
+        HDR_SUMMARY_FILL = PatternFill("solid", start_color="BDD7EE", end_color="BDD7EE")
+        headers = ["#", "Field Name", "Error Count", "% of Total Records"]
+        for c_idx, h in enumerate(headers, start=1):
             cell = ws.cell(row=3, column=c_idx, value=h)
-            cell.fill = hdr_fill
+            cell.fill = HDR_SUMMARY_FILL
             cell.font = Font(name="Arial", bold=True)
+            cell.border = THIN_BORDER
+            cell.alignment = Alignment(horizontal="center", vertical="center")
 
+        # ── Per-field rows ──
         col_error_counts = {}
         for bad_cols in error_map.values():
             for col in bad_cols:
                 col_error_counts[col] = col_error_counts.get(col, 0) + 1
 
         row_num = 4
-        total   = 0
-        for col_name, count in col_error_counts.items():
-            ws.cell(row=row_num, column=1, value="Site").font = BODY_FONT
-            ws.cell(row=row_num, column=2, value=col_name).font = BODY_FONT
-            ws.cell(row=row_num, column=3, value=count).font = BODY_FONT
-            total   += count
+        for field_num, (col_name, count) in enumerate(col_error_counts.items(), start=1):
+            pct = f"{(count / total_rows * 100):.2f}%" if total_rows > 0 else "0.00%"
+
+            ws.cell(row=row_num, column=1, value=field_num).font = BODY_FONT
+            ws.cell(row=row_num, column=2, value=col_name).font  = BODY_FONT
+            ws.cell(row=row_num, column=3, value=count).font     = BODY_FONT
+            ws.cell(row=row_num, column=4, value=pct).font       = BODY_FONT
+
+            for c in range(1, 5):
+                ws.cell(row=row_num, column=c).border    = THIN_BORDER
+                ws.cell(row=row_num, column=c).alignment = Alignment(horizontal="center")
+
             row_num += 1
 
-        total_fill = PatternFill("solid", start_color="F2F2F2", end_color="F2F2F2")
-        ws.cell(row=row_num, column=2, value="Total").font = Font(name="Arial", bold=True)
-        ws.cell(row=row_num, column=3, value=total).font = Font(name="Arial", bold=True)
-        for c in range(1, 4):
-            ws.cell(row=row_num, column=c).fill = total_fill
+        # ── TOTAL row ──
+        total_errors = sum(col_error_counts.values())
+        total_pct    = f"{(total_errors / total_rows * 100):.2f}%" if total_rows > 0 else "0.00%"
+        TOTAL_FILL   = PatternFill("solid", start_color="F2F2F2", end_color="F2F2F2")
 
-        ws.cell(
-            row=row_num + 2, column=1,
-            value="Each field has a separate sheet displaying all rows with errors for that field.",
-        ).font = Font(name="Arial", italic=True, size=9)
+        ws.cell(row=row_num, column=2, value="TOTAL").font      = Font(name="Arial", bold=True)
+        ws.cell(row=row_num, column=3, value=total_errors).font = Font(name="Arial", bold=True)
+        ws.cell(row=row_num, column=4, value=total_pct).font    = Font(name="Arial", bold=True)
+        for c in range(1, 5):
+            ws.cell(row=row_num, column=c).fill      = TOTAL_FILL
+            ws.cell(row=row_num, column=c).border    = THIN_BORDER
+            ws.cell(row=row_num, column=c).alignment = Alignment(horizontal="center")
 
-        ws.column_dimensions["A"].width = 14
-        ws.column_dimensions["B"].width = 28
-        ws.column_dimensions["C"].width = 18
+        # ── Spacer then stats block ──
+        row_num += 2
+
+        records_with_errors = len(error_map)
+        records_passing     = total_rows - records_with_errors
+
+        stats = [
+            ("Total Records:",       total_rows),
+            ("Records with Errors:", records_with_errors),
+            ("Records Passing:",     records_passing),
+        ]
+
+        STATS_LABEL_FILL = PatternFill("solid", start_color="EDEDED", end_color="EDEDED")
+        for label, value in stats:
+            label_cell = ws.cell(row=row_num, column=1, value=label)
+            label_cell.font      = Font(name="Arial", bold=True, size=10)
+            label_cell.fill      = STATS_LABEL_FILL
+            label_cell.border    = THIN_BORDER
+            label_cell.alignment = Alignment(horizontal="left", vertical="center")
+            ws.merge_cells(
+                start_row=row_num, start_column=1,
+                end_row=row_num,   end_column=2
+            )
+
+            value_cell = ws.cell(row=row_num, column=3, value=value)
+            value_cell.font      = Font(name="Arial", size=10)
+            value_cell.border    = THIN_BORDER
+            value_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            row_num += 1
+
+        # ── Column widths ──
+        col_widths = [6, 28, 16, 20]
+        for c_idx, width in enumerate(col_widths, start=1):
+            ws.column_dimensions[get_column_letter(c_idx)].width = width
 
     # ── Per-field error sheets ────────────────
     def _write_field_error_sheets(self, wb, df: pd.DataFrame):
-        """One sheet per errored field; shows ALL columns; highlights only the
-        failing cell red (whole row light yellow).  Row count matches Summary."""
+        """One sheet per errored field; whole row light yellow, failing cell red."""
         field_errors = self.validator.get_errors_by_field()
 
         for field_name, row_indices in field_errors.items():
-            # Sanitise sheet name (Excel limit: 31 chars, no special chars)
             sheet_name = field_name[:31].replace("/", "-").replace("\\", "-").replace("*", "")
             ws = wb.create_sheet(sheet_name)
 
-            # Build subset dataframe — only rows that failed THIS specific field
             subset = df.loc[row_indices].copy()
-
-            # Header
             self._write_header(ws, subset.columns)
 
-            # Column position lookup
             col_idx_map = {col: i for i, col in enumerate(subset.columns, start=1)}
 
-            # Write rows with highlighting
             for excel_row, (orig_idx, row_data) in enumerate(subset.iterrows(), start=2):
                 for c_idx, value in enumerate(row_data, start=1):
                     cell = ws.cell(row=excel_row, column=c_idx, value=value)
                     cell.font = BODY_FONT
-                    cell.fill = ROW_FILL          # whole row light yellow
+                    cell.fill = ROW_FILL
 
-                # Red only on the failing field cell
                 if field_name in col_idx_map:
                     bad_cell = ws.cell(row=excel_row, column=col_idx_map[field_name])
                     bad_cell.fill = RED_FILL
@@ -320,7 +389,6 @@ class SiteReportWriter:
 
             self._set_widths(ws)
 
-            # Row count note at bottom
             note_row = len(subset) + 3
             ws.cell(
                 row=note_row, column=1,
@@ -331,16 +399,13 @@ class SiteReportWriter:
     def _write_rules_sheet(self, wb):
         ws = wb.create_sheet(self.SHEET_RULES)
 
-        # Title row
         title_cell = ws.cell(row=1, column=1, value="Site Table – Validation Rules")
         title_cell.font = Font(name="Arial", bold=True, size=13)
         title_cell.fill = TITLE_FILL
         ws.merge_cells("A1:C1")
         title_cell.alignment = Alignment(horizontal="center")
 
-        # Column headers
-        headers = ["#", "Field", "Rule Description"]
-        for c_idx, h in enumerate(headers, start=1):
+        for c_idx, h in enumerate(["#", "Field", "Rule Description"], start=1):
             cell = ws.cell(row=3, column=c_idx, value=h)
             cell.fill = HDR_FILL
             cell.font = HDR_FONT
@@ -354,42 +419,34 @@ class SiteReportWriter:
             num_rules = len(rules_list)
 
             for r_idx, rule_text in enumerate(rules_list):
-                # Rule number — only in first sub-row of a field
                 num_cell = ws.cell(row=current_row, column=1,
                                    value=rule_num if r_idx == 0 else "")
-                num_cell.font  = Font(name="Arial", size=10, bold=(r_idx == 0))
-                num_cell.fill  = RULE_FILL
-                num_cell.border = THIN_BORDER
+                num_cell.font      = Font(name="Arial", size=10, bold=(r_idx == 0))
+                num_cell.fill      = RULE_FILL
+                num_cell.border    = THIN_BORDER
                 num_cell.alignment = Alignment(horizontal="center", vertical="center")
 
-                # Field name — only in first sub-row
                 field_cell = ws.cell(row=current_row, column=2,
                                      value=field if r_idx == 0 else "")
-                field_cell.font  = Font(name="Arial", size=10, bold=(r_idx == 0))
-                field_cell.fill  = RULE_FILL
-                field_cell.border = THIN_BORDER
+                field_cell.font      = Font(name="Arial", size=10, bold=(r_idx == 0))
+                field_cell.fill      = RULE_FILL
+                field_cell.border    = THIN_BORDER
                 field_cell.alignment = Alignment(vertical="center")
 
-                # Rule description
                 desc_cell = ws.cell(row=current_row, column=3, value=rule_text)
-                desc_cell.font   = BODY_FONT
-                desc_cell.border = THIN_BORDER
+                desc_cell.font      = BODY_FONT
+                desc_cell.border    = THIN_BORDER
                 desc_cell.alignment = Alignment(wrap_text=True, vertical="center")
 
                 current_row += 1
 
-            # Merge #  and Field cells vertically if field has multiple rules
             if num_rules > 1:
                 merge_start = current_row - num_rules
                 merge_end   = current_row - 1
-                ws.merge_cells(
-                    start_row=merge_start, start_column=1,
-                    end_row=merge_end,     end_column=1,
-                )
-                ws.merge_cells(
-                    start_row=merge_start, start_column=2,
-                    end_row=merge_end,     end_column=2,
-                )
+                ws.merge_cells(start_row=merge_start, start_column=1,
+                               end_row=merge_end,     end_column=1)
+                ws.merge_cells(start_row=merge_start, start_column=2,
+                               end_row=merge_end,     end_column=2)
 
             rule_num += 1
 
@@ -402,17 +459,21 @@ class SiteReportWriter:
     def write(self):
         v  = self.validator
         df = v.df.copy()
+
+        # ERROR_COLUMNS: pipe-separated, condition-specific failure reasons
         error_series        = v.get_error_series()
         df["ERROR_COLUMNS"] = df.index.map(
             lambda i: error_series.get(i, "") if i in error_series.index else ""
         )
 
         col_index = {col: i for i, col in enumerate(df.columns, start=1)}
-        error_df  = df[df.index.isin(v.error_map.keys())].copy()
+
+        # ── commented out: error_df used only for Error Rows sheet
+        # error_df  = df[df.index.isin(v.error_map.keys())].copy()
 
         wb = Workbook()
 
-        # Sheet 1 – Full Data
+        # ── Sheet 1 – Full Data ──
         ws_all = wb.active
         ws_all.title = self.SHEET_ALL
         self._write_header(ws_all, df.columns)
@@ -420,36 +481,40 @@ class SiteReportWriter:
         self._highlight(ws_all, df, v.error_map, col_index)
         self._set_widths(ws_all)
 
-        # Sheet 2 – Error Rows
-        ws_err = wb.create_sheet(self.SHEET_ERRORS)
-        self._write_header(ws_err, error_df.columns)
-        self._write_rows(ws_err, error_df)
-        err_col_idx = {col: i for i, col in enumerate(error_df.columns, start=1)}
-        for sheet2_row, orig_idx in enumerate(error_df.index, start=2):
-            bad_cols   = v.error_map[orig_idx]
-            total_cols = len(error_df.columns)
-            for c in range(1, total_cols + 1):
-                ws_err.cell(row=sheet2_row, column=c).fill = ROW_FILL
-            for col_name in bad_cols:
-                if col_name in err_col_idx:
-                    cell = ws_err.cell(row=sheet2_row, column=err_col_idx[col_name])
-                    cell.fill = RED_FILL
-                    cell.font = ERR_FONT
-        self._set_widths(ws_err)
+        # ════════════════════════════════════════
+        # Sheet 2 – Error Rows (COMMENTED OUT)
+        # ════════════════════════════════════════
+        # error_df  = df[df.index.isin(v.error_map.keys())].copy()
+        # ws_err = wb.create_sheet(self.SHEET_ERRORS)
+        # self._write_header(ws_err, error_df.columns)
+        # self._write_rows(ws_err, error_df)
+        # err_col_idx = {col: i for i, col in enumerate(error_df.columns, start=1)}
+        # for sheet2_row, orig_idx in enumerate(error_df.index, start=2):
+        #     bad_cols   = v.error_map[orig_idx]
+        #     total_cols = len(error_df.columns)
+        #     for c in range(1, total_cols + 1):
+        #         ws_err.cell(row=sheet2_row, column=c).fill = ROW_FILL
+        #     for col_name in bad_cols:
+        #         if col_name in err_col_idx:
+        #             cell = ws_err.cell(row=sheet2_row, column=err_col_idx[col_name])
+        #             cell.fill = RED_FILL
+        #             cell.font = ERR_FONT
+        # self._set_widths(ws_err)
+        # ════════════════════════════════════════
 
-        # Sheet 3 – Summary
-        self._write_summary_sheet(wb, v.error_map)
+        # ── Sheet 3 – Summary (updated format) ──
+        self._write_summary_sheet(wb, v.error_map, total_rows=len(df))
 
-        # Sheets 4+ – One sheet per errored field (row count matches Summary)
+        # ── Sheets 4+ – One sheet per errored field ──
         self._write_field_error_sheets(wb, df)
 
-        # Last sheet – Rules
+        # ── Last sheet – Rules ──
         self._write_rules_sheet(wb)
 
         wb.save(self.output_path)
         print(f"\n✅  Output saved  → {self.output_path}")
         print(f"   Total rows    : {len(df)}")
-        print(f"   Error rows    : {len(error_df)}")
+        print(f"   Error rows    : {len(v.error_map)}")
         print(f"   Field sheets  : {list(v.get_errors_by_field().keys())}")
 
 
