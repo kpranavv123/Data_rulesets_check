@@ -64,6 +64,7 @@ KEEP_COLS = [
     "MATERIALNUMBER",
     "PLANT",
     "PRODUCTDESCRIPTION",
+    "PRODUCTTYPE",
     "PRODUCTHIERARCHY",
     "MRPTYPE",
     "PROCUREMENTTYPE",
@@ -658,4 +659,3 @@ if __name__ == "__main__":
         valid_plants = VALID_PLANTS,
     )
     processor.run()
-    
