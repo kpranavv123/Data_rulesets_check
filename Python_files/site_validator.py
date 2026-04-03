@@ -42,6 +42,16 @@ VALID_PLANTS = [
 # Valid values for COMPANYCODE
 VALID_COMPANY_CODES = {"1001", "1006", "1009"}
 
+# ─────────────────────────────────────────────
+#  Only these 5 columns kept in every output sheet
+# ─────────────────────────────────────────────
+KEEP_COLS = ["PLANT", "NAME", "ADDRESS", "TCPL_PLANTTYPE", "COMPANYCODE"]
+
+# ─────────────────────────────────────────────
+#  COLUMNS TO KEEP in every output sheet
+# ─────────────────────────────────────────────
+KEEP_COLS = ["PLANT", "NAME", "ADDRESS", "TCPL_PLANTTYPE", "COMPANYCODE"]
+
 
 # ─────────────────────────────────────────────
 #  Colours
@@ -387,6 +397,10 @@ class SiteReportWriter:
 
             subset = df.loc[row_indices].copy()
 
+            # Keep only the 5 required columns + ERROR_COLUMNS
+            keep_here = [c for c in KEEP_COLS if c in subset.columns] + ["ERROR_COLUMNS"]
+            subset    = subset[keep_here]
+
             # Override ERROR_COLUMNS with ONLY this field's message
             field_err_series        = self.validator.get_field_error_series(field_name)
             subset["ERROR_COLUMNS"] = subset.index.map(
@@ -483,6 +497,10 @@ class SiteReportWriter:
         df["ERROR_COLUMNS"] = df.index.map(
             lambda i: error_series.get(i, "") if i in error_series.index else ""
         )
+
+        # Keep only the 5 required columns + ERROR_COLUMNS in all sheets
+        keep_cols = [c for c in KEEP_COLS if c in df.columns] + ["ERROR_COLUMNS"]
+        df        = df[keep_cols]
 
         col_index = {col: i for i, col in enumerate(df.columns, start=1)}
 
