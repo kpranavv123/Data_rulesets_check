@@ -58,6 +58,22 @@ THIN_BORDER = Border(
 
 
 # ─────────────────────────────────────────────
+#  Only these 10 columns kept in every output sheet
+# ─────────────────────────────────────────────
+KEEP_COLS = [
+    "MATERIALNUMBER",
+    "PLANT",
+    "PRODUCTDESCRIPTION",
+    "PRODUCTHIERARCHY",
+    "MRPTYPE",
+    "PROCUREMENTTYPE",
+    "ABCINDICATOR",
+    "IBPSTATUS",
+    "XPLANTMATSTATUS",
+]
+
+
+# ─────────────────────────────────────────────
 #  Human-readable one-liner error messages per field
 #  (used in Full Data sheet ERROR_COLUMNS — all errors shown)
 # ─────────────────────────────────────────────
@@ -458,11 +474,15 @@ class ReportWriter:
             # Build subset with ERROR_COLUMNS showing ONLY this field's error
             subset = df.loc[row_indices].copy()
 
-            # Get per-field error series — only this field's message
-            field_err_series = self.validator.get_field_error_series(field_name)
+            # Override ERROR_COLUMNS with ONLY this field's message (before column filter)
+            field_err_series        = self.validator.get_field_error_series(field_name)
             subset["ERROR_COLUMNS"] = subset.index.map(
-                lambda i: field_err_series.get(i, "")
+                lambda i, f=field_name: field_err_series.get(i, "")
             )
+
+            # Keep only the 10 required columns + ERROR_COLUMNS
+            keep_here = [c for c in KEEP_COLS if c in subset.columns] + ["ERROR_COLUMNS"]
+            subset    = subset[keep_here]
 
             self._write_header(ws, subset.columns)
 
@@ -554,6 +574,11 @@ class ReportWriter:
 
         # Full Data ERROR_COLUMNS: all field errors for each row
         df["ERROR_COLUMNS"] = df.index.map(lambda i: v.get_error_series().get(i, ""))
+
+        # Keep only the 10 required columns + ERROR_COLUMNS in all sheets
+        keep_cols = [c for c in KEEP_COLS if c in df.columns] + ["ERROR_COLUMNS"]
+        df        = df[keep_cols]
+
         col_index = {col: i for i, col in enumerate(df.columns, start=1)}
 
         wb = Workbook()
